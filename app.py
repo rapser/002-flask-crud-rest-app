@@ -1,55 +1,66 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
+from bson import json_util
+from bson.objectid import ObjectId
+
+import pymongo
+import certifi
 
 app = Flask(__name__)
 
-from products import products
+client = pymongo.MongoClient("mongodb+srv://rapser:rapser2018@cluster0.5zuzx.mongodb.net/?retryWrites=true&w=majority",tlsCAFile=certifi.where())
+db = client['tienda']
+print(client.list_database_names())
 
-@app.route('/ping')
-def ping():
-    return jsonify({"message": "Hola Miguel"})
+@app.route('/products/<string:id>', methods=['GET'])
+def getProduct(id):
+
+    product = db.productos.find_one({"_id": ObjectId(id)})
+    response = json_util.dumps(product)
+    return Response(response, mimetype='application/json')
 
 @app.route('/products', methods=['GET'])
 def getProducts():
-    return jsonify({"message": "Lista de productos","products": products})
-
-
-@app.route('/products/<string:productName>', methods=['GET'])
-def getProduct(productName):
-    productsFound = [product for product in products if product['name'] == productName]
-    if (len(productsFound) > 0):
-        return jsonify({"product": productsFound[0]})
-    return jsonify({"message": "producto no encontrado"})
+    products = db.productos.find()
+    res = json_util.dumps(products)
+    return Response(res, mimetype='application/json')
 
 @app.route('/products', methods=['POST'])
 def addProduct():
-    new_product = {
-        "name": request.json['name'],
-        "price": request.json['price'],
-        "quantity": request.json['quantity']
-    }
 
-    products.append(new_product)
-    return jsonify({"message": "producto agregado"})
+    name = request.json['name']
+    price = request.json['price']
+    quantity = request.json['quantity']
+    
+    if name and price and quantity:
+        db.productos.insert_one({
+            'name': name,
+            'price': price,
+            'quantity': quantity
+        })
 
-@app.route('/products/<string:product_name>', methods=['PUT'])
-def editProduct(product_name):
-    productFound = [product for product in products if product['name'] == product_name]
-    if (len(productFound) > 0):
-        productFound[0]['name'] = request.json['name']
-        productFound[0]['price'] = request.json['price']
-        productFound[0]['quantity'] = request.json['quantity']
-        return jsonify({"message": "producto actualizado"})
+    res = json_util.dumps({"message": "agregado"})
+    return Response(res, mimetype='application/json')
 
-    return jsonify({"message": "producto no encontrado"})
+@app.route('/products/<string:id>', methods=['DELETE'])
+def deleteProduct(id):
+    productFound = db.productos.delete_one({"_id": ObjectId(id)})
+    response = json_util.dumps({"message": "eliminado"})
+    return Response(response, mimetype='application/json')
 
-@app.route('/products/<string:product_name>', methods=['DELETE'])
-def deleteProduct(product_name):
-    productFound = [product for product in products if product['name'] == product_name]
-    if (len(productFound) > 0):
-        products.remove(productFound[0])
-        return jsonify({"message": "producto eliminado"})
+@app.route('/products/<string:id>', methods=['PUT'])
+def editProduct(id):
 
-    return jsonify({"message": "producto no encontrado"})
+    name = request.json['name']
+    price = request.json['price']
+    quantity = request.json['quantity']
+
+    db.productos.update_one({"_id": ObjectId(id)}, {"$set": {
+        'name': name,
+        'price': price,
+        'quantity': quantity
+    }})
+
+    return jsonify({"message": "el usuario " + id + " fue actualizado"})
 
 if (__name__) == '__main__' :
     app.run(debug= True, port= 4000)
