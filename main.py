@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request, Response
 from bson import json_util
 from bson.objectid import ObjectId
-from src.connection import *
+from src.connection import obtener_bd
 
 app = Flask(__name__)
 import pymongo
